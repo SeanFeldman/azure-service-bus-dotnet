@@ -13,9 +13,9 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
 
     public class SenderReceiverTests : SenderReceiverClientTestBase
     {
-        private static TimeSpan TwoSeconds = TimeSpan.FromSeconds(2);
+        private static readonly TimeSpan TwoSeconds = TimeSpan.FromSeconds(2);
 
-        public static IEnumerable<object[]> TestPermutations => new object[][]
+        public static IEnumerable<object[]> TestPermutations => new[]
         {
             new object[] {TestConstants.NonPartitionedQueueName},
             new object[] {TestConstants.PartitionedQueueName}
@@ -376,7 +376,7 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
 
                 var recivedMessage = await receiver.ReceiveAsync().ConfigureAwait(false);
                 Assert.True(Encoding.UTF8.GetString(recivedMessage.Body) == Encoding.UTF8.GetString(messageBody));
-            
+
                 var connection = sender.ServiceBusConnection;
                 Assert.Throws<ObjectDisposedException>(() => new MessageSender(connection, TestConstants.PartitionedQueueName));
             }
@@ -413,7 +413,7 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
 
                 messageBody = Encoding.UTF8.GetBytes("Message 2");
                 message = new Message(messageBody);
-                await sender.SendAsync(message); 
+                await sender.SendAsync(message);
 
                 recivedMessage = await receiver.ReceiveAsync().ConfigureAwait(false);
                 Assert.True(Encoding.UTF8.GetString(recivedMessage.Body) == Encoding.UTF8.GetString(messageBody));
@@ -452,6 +452,39 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
                 recivedMessage = await receiver.ReceiveAsync().ConfigureAwait(false);
                 Assert.True(Encoding.UTF8.GetString(recivedMessage.Body) == Encoding.UTF8.GetString(messageBody));
 
+            }
+            finally
+            {
+                await sender.CloseAsync().ConfigureAwait(false);
+                await receiver.CloseAsync().ConfigureAwait(false);
+            }
+        }
+
+        [Fact]
+        [DisplayTestMethodName]
+        public async Task Sending_batch()
+        {
+            var sender = new MessageSender(TestUtility.NamespaceConnectionString, TestConstants.PartitionedQueueName);
+            var receiver = new MessageReceiver(TestUtility.NamespaceConnectionString, TestConstants.PartitionedQueueName, receiveMode: ReceiveMode.ReceiveAndDelete);
+            try
+            {
+                var message1 = new Message(Encoding.UTF8.GetBytes("Hello Neeraj"));
+                var message2 = new Message(Encoding.UTF8.GetBytes("from"));
+                var message3 = new Message(Encoding.UTF8.GetBytes("Sean Feldman"));
+
+                var batch = new Batch(100);
+                Assert.True(batch.TryAdd(message1), "Couldn't add first message");
+                Assert.True(batch.TryAdd(message2), "Couldn't add second message");
+                Assert.False(batch.TryAdd(message3), "Shouldn't be able to add third message");
+                await sender.SendAsync(batch);
+                //batch.dispose()
+                await sender.CloseAsync();
+
+                var receivedMessages = await TestUtility.ReceiveMessagesAsync(receiver, 2);
+                Assert.Equal("Hello Neeraj", Encoding.UTF8.GetString(receivedMessages[0].Body));
+                Assert.Equal("from", Encoding.UTF8.GetString(receivedMessages[1].Body));
+                var extraMessage = await TestUtility.PeekMessageAsync(receiver);
+                Assert.True(extraMessage == null, "Should not have any messages other than the two, but an extra message is found");
             }
             finally
             {
