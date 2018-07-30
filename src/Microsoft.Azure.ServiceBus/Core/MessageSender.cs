@@ -267,6 +267,10 @@ namespace Microsoft.Azure.ServiceBus.Core
 
             MessagingEventSource.Log.MessageSendStop(this.ClientId);
         }
+
+        /// <summary>
+        /// Sends a <see cref="Batch"/> of messages to Service Bus.
+        /// </summary>
         public async Task SendAsync(Batch batch)
         {
             this.ThrowIfClosed();
