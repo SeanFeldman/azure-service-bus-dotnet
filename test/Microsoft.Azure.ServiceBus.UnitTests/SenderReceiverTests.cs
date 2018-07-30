@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System.Linq;
+
 namespace Microsoft.Azure.ServiceBus.UnitTests
 {
     using System;
@@ -477,12 +479,14 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
                 Assert.True(batch.TryAdd(message2), "Couldn't add second message");
                 Assert.False(batch.TryAdd(message3), "Shouldn't be able to add third message");
                 await sender.SendAsync(batch);
-                //batch.dispose()
+                batch.Dispose();
                 await sender.CloseAsync();
 
                 var receivedMessages = await TestUtility.ReceiveMessagesAsync(receiver, 2);
-                Assert.Equal("Hello Neeraj", Encoding.UTF8.GetString(receivedMessages[0].Body));
-                Assert.Equal("from", Encoding.UTF8.GetString(receivedMessages[1].Body));
+                var bodies = receivedMessages.Select(m => Encoding.UTF8.GetString(m.Body));
+                Assert.Collection(bodies, item => Assert.Contains("Hello Neeraj", item),
+                                          item => Assert.Contains("from", item));
+
                 var extraMessage = await TestUtility.PeekMessageAsync(receiver);
                 Assert.True(extraMessage == null, "Should not have any messages other than the two, but an extra message is found");
             }
