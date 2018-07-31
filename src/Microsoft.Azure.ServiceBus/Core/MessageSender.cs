@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using Microsoft.Azure.ServiceBus.Diagnostics;
+
 namespace Microsoft.Azure.ServiceBus.Core
 {
     using System;
@@ -15,6 +17,7 @@ namespace Microsoft.Azure.ServiceBus.Core
     using Microsoft.Azure.Amqp.Framing;
     using Microsoft.Azure.ServiceBus.Amqp;
     using Microsoft.Azure.ServiceBus.Primitives;
+
 
     /// <summary>
     /// The MessageSender can be used to send messages to Queues or Topics.
@@ -236,7 +239,7 @@ namespace Microsoft.Azure.ServiceBus.Core
         {
             this.ThrowIfClosed();
 
-            var count = MessageSender.ValidateMessages(messageList);
+            var count = MessageSender.VerifyMessagesAreNotPreviouslyReceived(messageList);
             MessagingEventSource.Log.MessageSendStart(this.ClientId, count);
 
             bool isDiagnosticSourceEnabled = ServiceBusDiagnosticSource.IsEnabled();
@@ -275,7 +278,6 @@ namespace Microsoft.Azure.ServiceBus.Core
         {
             this.ThrowIfClosed();
 
-            //var count = MessageSender.ValidateMessages(messageList);
 //            MessagingEventSource.Log.MessageSendStart(this.ClientId, count);
 
 //            var isDiagnosticSourceEnabled = ServiceBusDiagnosticSource.IsEnabled();
@@ -335,7 +337,7 @@ namespace Microsoft.Azure.ServiceBus.Core
             }
 
             message.ScheduledEnqueueTimeUtc = scheduleEnqueueTimeUtc.UtcDateTime;
-            MessageSender.ValidateMessage(message);
+            message.VerifyMessageIsNotPreviouslyReceived();
             MessagingEventSource.Log.ScheduleMessageStart(this.ClientId, scheduleEnqueueTimeUtc);
             long result = 0;
 
@@ -484,7 +486,7 @@ namespace Microsoft.Azure.ServiceBus.Core
             await this.RequestResponseLinkManager.CloseAsync().ConfigureAwait(false);
         }
 
-        static int ValidateMessages(IList<Message> messageList)
+        static int VerifyMessagesAreNotPreviouslyReceived(IList<Message> messageList)
         {
             var count = 0;
             if (messageList == null)
@@ -495,18 +497,10 @@ namespace Microsoft.Azure.ServiceBus.Core
             foreach (var message in messageList)
             {
                 count++;
-                ValidateMessage(message);
+                message.VerifyMessageIsNotPreviouslyReceived();
             }
 
             return count;
-        }
-
-        static void ValidateMessage(Message message)
-        {
-            if (message.SystemProperties.IsLockTokenSet)
-            {
-                throw Fx.Exception.Argument(nameof(message), "Cannot send a message that was already received.");
-            }
         }
 
         static void CloseSession(SendingAmqpLink link)
