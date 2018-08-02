@@ -463,6 +463,35 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
 
         [Fact]
         [DisplayTestMethodName]
+        public async Task Sending_batch_with_properties()
+        {
+            var sender = new MessageSender(TestUtility.NamespaceConnectionString, TestConstants.PartitionedQueueName);
+            var receiver = new MessageReceiver(TestUtility.NamespaceConnectionString, TestConstants.PartitionedQueueName, receiveMode: ReceiveMode.ReceiveAndDelete);
+            try
+            {
+                var message = new Message("Hello Neeraj".GetBytes());
+                message.UserProperties["custom"] = "value";
+
+                var batch = new Batch(100);
+                Assert.True(batch.TryAdd(message), "Couldn't add first message");
+                await sender.SendAsync(batch);
+                batch.Dispose();
+                await sender.CloseAsync();
+
+                var receivedMessages = await TestUtility.ReceiveMessagesAsync(receiver, 1);
+                var receivedMessage = receivedMessages.FirstOrDefault();
+                Assert.NotNull(receivedMessage);
+                Assert.Equal("value", receivedMessage.UserProperties["custom"]);
+            }
+            finally
+            {
+                await sender.CloseAsync().ConfigureAwait(false);
+                await receiver.CloseAsync().ConfigureAwait(false);
+            }
+        }
+
+        [Fact]
+        [DisplayTestMethodName]
         public async Task Sending_batch()
         {
             var sender = new MessageSender(TestUtility.NamespaceConnectionString, TestConstants.PartitionedQueueName);
