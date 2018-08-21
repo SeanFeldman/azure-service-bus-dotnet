@@ -38,6 +38,7 @@ namespace Microsoft.Azure.ServiceBus.Core
             this.pluginsCallback = pluginsCallback;
             this.datas = new List<Data>();
             this.result = AmqpMessage.Create(datas);
+            OriginalMessageList = new List<Message>();
         }
 
         /// <summary>
@@ -66,6 +67,7 @@ namespace Microsoft.Azure.ServiceBus.Core
 
             if (Size <= maximumBatchSize)
             {
+                OriginalMessageList.Add(message);
                 return true;
             }
 
@@ -127,8 +129,8 @@ namespace Microsoft.Azure.ServiceBus.Core
             firstMessage?.Dispose();
             result?.Dispose();
 
-            firstMessage = null;
-            result = null;
+            datas.Clear();
+            OriginalMessageList.Clear();
         }
 
         private void ThrowIfDisposed()
@@ -138,6 +140,8 @@ namespace Microsoft.Azure.ServiceBus.Core
                 throw new Exception("Batch is has been disposed and cannot be re-used.");
             }
         }
+
+        internal List<Message> OriginalMessageList { get; }
 
         private string DebuggerDisplay => $"Batch: size={Size} message count={datas.Count} maximum size={maximumBatchSize}";
     }

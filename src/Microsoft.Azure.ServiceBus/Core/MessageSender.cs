@@ -283,7 +283,7 @@ namespace Microsoft.Azure.ServiceBus.Core
             var isDiagnosticSourceEnabled = ServiceBusDiagnosticSource.IsEnabled();
             // TODO: diagnostics (Start/Stop) is currently not possible. Requires change in how Diagnostics works.
             // See https://github.com/SeanFeldman/azure-service-bus-dotnet/pull/1#issuecomment-415515524 for details.
-            // var activity = isDiagnosticSourceEnabled ? this.diagnosticSource.SendStart(messageList) : null;
+            var activity = isDiagnosticSourceEnabled ? this.diagnosticSource.SendStart(batch.OriginalMessageList) : null;
             Task sendTask;
 
             try
@@ -303,10 +303,10 @@ namespace Microsoft.Azure.ServiceBus.Core
             }
             // finally
             // {
-            //     this.diagnosticSource.SendStop(activity, messageList, sendTask?.Status);
+                this.diagnosticSource.SendStop(activity, batch.OriginalMessageList, sendTask?.Status);
             // }
 
-            // MessagingEventSource.Log.MessageSendStop(this.ClientId);
+            MessagingEventSource.Log.MessageSendStop(this.ClientId);
         }
 
         /// <summary>

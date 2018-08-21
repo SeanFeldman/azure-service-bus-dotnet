@@ -311,6 +311,40 @@ namespace Microsoft.Azure.ServiceBus.UnitTests.Diagnostics
 
         [Fact]
         [DisplayTestMethodName]
+        async Task BatchSendWithBatchReceiveFireEvents()
+        {
+            this.queueClient = new QueueClient(TestUtility.NamespaceConnectionString, TestConstants.NonPartitionedQueueName,
+                ReceiveMode.ReceiveAndDelete);
+
+            this.listener.Enable( (name, queuName, arg) => name.Contains("Send") || name.Contains("Receive") );
+            await TestUtility.SendMessagesUsingBatchAsync(this.queueClient.InnerSender, 5);
+            var messages = await TestUtility.ReceiveMessagesAsync(this.queueClient.InnerReceiver, 5);
+
+            Assert.True(this.events.TryDequeue(out var sendStart1));
+            AssertSendStart(sendStart1.eventName, sendStart1.payload, sendStart1.activity, null, 5);
+
+            Assert.True(this.events.TryDequeue(out var sendStop1));
+            AssertSendStop(sendStop1.eventName, sendStop1.payload, sendStop1.activity, sendStop1.activity, 5);
+
+            int receivedStopCount = 0;
+            string relatedTo = "";
+            while (this.events.TryDequeue(out var receiveStart))
+            {
+                var startCount = AssertReceiveStart(receiveStart.eventName, receiveStart.payload, receiveStart.activity, -1);
+
+                Assert.True(this.events.TryDequeue(out var receiveStop));
+                receivedStopCount += AssertReceiveStop(receiveStop.eventName, receiveStop.payload, receiveStop.activity, receiveStart.activity, null, startCount, -1);
+                relatedTo += receiveStop.activity.Tags.Single(t => t.Key == "RelatedTo").Value;
+            }
+
+            Assert.Equal(5, receivedStopCount);
+            Assert.Contains(sendStart1.activity.Id, relatedTo);
+
+            Assert.True(this.events.IsEmpty);
+        }
+
+        [Fact]
+        [DisplayTestMethodName]
         async Task PeekFireEvents()
         {
             this.queueClient = new QueueClient(TestUtility.NamespaceConnectionString, TestConstants.NonPartitionedQueueName, ReceiveMode.PeekLock);

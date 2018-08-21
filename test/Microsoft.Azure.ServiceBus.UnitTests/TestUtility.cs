@@ -66,6 +66,25 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
             await messageSender.SendAsync(messagesToSend);
             Log($"Sent {messageCount} messages");
         }
+        internal static async Task SendMessagesUsingBatchAsync(IMessageSender messageSender, int messageCount)
+        {
+            if (messageCount == 0)
+            {
+                await Task.FromResult(false);
+            }
+
+            var sender = (MessageSender)messageSender;
+            var batch = await sender.CreateBatch();
+            for (var i = 0; i < messageCount; i++)
+            {
+                var message = new Message(Encoding.UTF8.GetBytes("test" + i));
+                message.Label = "test" + i;
+                await batch.TryAdd(message);
+            }
+
+            await sender.SendAsync(batch);
+            Log($"Sent {messageCount} messages");
+        }
 
         internal static async Task<IList<Message>> ReceiveMessagesAsync(IMessageReceiver messageReceiver, int messageCount)
         {
@@ -98,7 +117,7 @@ namespace Microsoft.Azure.ServiceBus.UnitTests
                 var msg = await messageReceiver.ReceiveDeferredMessageAsync(sequenceNumber);
                 if (msg != null)
                 {
-                    messagesToReturn.Add(msg); 
+                    messagesToReturn.Add(msg);
                 }
             }
 
